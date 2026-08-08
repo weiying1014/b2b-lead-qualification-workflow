@@ -47,4 +47,4 @@ N8N · Google Gemini (LLM) · Tavily (web search) · Google Sheets · Gmail
 
 ---
 
-Built by [Fluwormie](https://github.com/weiying1014) — e-commerce operations professional exploring automation and RevOps workflows.
+Built by [Wei Ying](https://github.com/weiying1014) — e-commerce operations professional exploring automation and RevOps workflows.
