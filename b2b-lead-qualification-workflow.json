@@ -1,0 +1,453 @@
+{
+  "name": "B2B Lead Qualification & Routing",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMonth"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Lead Scorecard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 0,
+          "mode": "list",
+          "cachedResultName": "Form responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [-1040, -160],
+      "id": "309e4ff1-0f08-4c1a-bc7c-f5d83dbc8643",
+      "name": "Google Sheets Trigger",
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [-816, -336],
+      "id": "cba5fce8-3fa7-4731-bf80-aae31e331b21",
+      "name": "Loop Over Items",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1d22a472-362a-47a6-9594-5d681be37d02",
+              "name": "Search Query",
+              "value": "=Research {{ $json['Company Name'] }}({{ $json['Company Website'] }}). Provide company industry, company size, recent year annual revenue.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-592, -320],
+      "id": "8a98c9dd-976b-406e-8686-ba073192b19c",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "query": "={{ $json['Search Query'] }}",
+        "options": {
+          "search_depth": "basic",
+          "max_results": 3,
+          "include_answer": "basic"
+        }
+      },
+      "type": "@tavily/n8n-nodes-tavily.tavily",
+      "typeVersion": 1,
+      "position": [-368, -320],
+      "id": "4f25e1ae-f53d-4cbc-a8ff-1d3f3974c933",
+      "name": "Search",
+      "credentials": {
+        "tavilyApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Tavily account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c7bd2d5b-f31b-4539-8248-dff61e230180",
+              "name": "=research Summary",
+              "value": "={{ $json.answer }}",
+              "type": "string"
+            },
+            {
+              "id": "0e3bf00b-5113-4884-91ee-79f69ea6f5fa",
+              "name": "company Name",
+              "value": "={{ $('Loop Over Items').item.json['Company Name'] }}",
+              "type": "string"
+            },
+            {
+              "id": "7dfe72f7-73cb-4c0d-96ad-12f3b972343f",
+              "name": "domain",
+              "value": "={{ $('Loop Over Items').item.json['Company Website'] }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [-144, -320],
+      "id": "046417b4-c77c-45c5-b7aa-f4dedd48d525",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Company: {{ $('Loop Over Items').item.json['Company Name'] }}\nDomain: {{ $json.domain }}\n\nResearch findings:\n{{ $json['research Summary'] }}\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a lead qualification assistant for a B2B SaaS company. Score this company 0-100 based on: company size fit (+30 max), industry fit (+20 max), growth/funding signals (+25 max), revenue signals (+25 max). Add up the four sub-scores and state the total before giving the final category. Categorize: 70+ = hot, 40-69 = warm, below 40 = cold. Respond only in the required JSON format."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [80, -320],
+      "id": "2ecb16d0-8fe5-46f2-b275-85131baba74d",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.1-flash-lite",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [32, -112],
+      "id": "6accc80c-ac54-432e-98b5-96c38f25db78",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"score\": 0,\n  \"category\": \"string\",\n  \"market\": \"string\",\n  \"reasoning\": \"string\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [224, -96],
+      "id": "029d9132-d070-408d-a1f4-1ba327bef674",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.output.category }}",
+                    "rightValue": "hot",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "36ed51b5-2dc8-4399-bcc6-dcf9dddfa8ec"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Hot"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "25f76149-69d1-4d68-92a1-fcba4ecbfa58",
+                    "leftValue": "={{ $json.output.category }}",
+                    "rightValue": "warm",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Warm"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "8f8e5b55-6b82-4467-9f2f-b4cd5f46b1e8",
+                    "leftValue": "={{ $json.output.category }}",
+                    "rightValue": "cold",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Cold"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [432, -144],
+      "id": "f3b1e07c-96a7-4bfe-b73b-ff4f22190756",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@example.com",
+        "subject": "New cold lead is in.",
+        "message": "=New Lead as below is in. \nCompany Name : {{ $('Edit Fields1').item.json['company Name'] }}\nCompany Domain : {{ $('Edit Fields1').item.json.domain }}\nSummary : {{ $('Edit Fields1').item.json['research Summary'] }}\nMarket : {{ $json.output.market}}\nScore : {{ $json.output.score }}\n\nPlease react to it.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [656, 64],
+      "id": "b02f3ec0-b195-492f-9317-e92aa5108ab1",
+      "name": "Send Cold Lead Notification",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@example.com",
+        "subject": "New warm lead is in.",
+        "message": "=New Lead as below is in. \nCompany Name : {{ $('Edit Fields1').item.json['company Name'] }}\nCompany Domain : {{ $('Edit Fields1').item.json.domain }}\nSummary : {{ $('Edit Fields1').item.json['research Summary'] }}\nMarket : {{ $json.output.market}}\nScore : {{ $json.output.score }}\n\nPlease react to it.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [656, -128],
+      "id": "deb00c73-fe8f-467d-9bc9-d064ef453e1f",
+      "name": "Send Warm Lead Notification",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "your-email@example.com",
+        "subject": "New HOT lead is in.",
+        "message": "=New Lead as below is in. \nCompany Name : {{ $('Edit Fields1').item.json['company Name'] }}\nCompany Domain : {{ $('Edit Fields1').item.json.domain }}\nSummary : {{ $('Edit Fields1').item.json['research Summary'] }}\nMarket : {{ $json.output.market}}\nScore : {{ $json.output.score }}\n\nPlease react to it.",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [656, -320],
+      "id": "6ac1dbf6-eb42-4944-a2ca-17bed1e59266",
+      "name": "Send Hot Lead Notification",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "YOUR_GOOGLE_SHEET_ID",
+          "mode": "list",
+          "cachedResultName": "Lead Scorecard",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 0,
+          "mode": "list",
+          "cachedResultName": "Form responses 1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "=",
+            "Category": "={{ $json.output.category }}",
+            "Score": "={{ $json.output.score }}",
+            "Market": "={{ $json.output.market }}",
+            "Company Website": "={{ $('Google Sheets Trigger').item.json['Company Website'] }}",
+            "Reasoning": "={{ $json.output.reasoning }}"
+          },
+          "matchingColumns": ["Company Website"],
+          "schema": [
+            { "id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Company Name", "displayName": "Company Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Company Website", "displayName": "Company Website", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Personnel Name", "displayName": "Personnel Name", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Personnel Email", "displayName": "Personnel Email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": true },
+            { "id": "Category", "displayName": "Category", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Score", "displayName": "Score", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Market", "displayName": "Market", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "Reasoning", "displayName": "Reasoning", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false },
+            { "id": "row_number", "displayName": "row_number", "required": false, "defaultMatch": false, "display": true, "type": "number", "canBeUsedToMatch": true, "readOnly": true, "removed": false }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [656, -512],
+      "id": "44ff6d9b-8ce7-4429-9b32-70edb4e4f885",
+      "name": "Update Row in Sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [880, -192],
+      "id": "adde74bd-1f0b-4321-8db6-e49e88f2ebfa",
+      "name": "No Operation, do nothing"
+    },
+    {
+      "parameters": {
+        "content": "B2B Lead Qualification & Routing Pipeline\nCreated by: Low Wei Ying\n\nThis workflow researches a lead's public company information online, scores lead quality on a 0-100 scale, categorizes leads into hot/warm/cold, and routes them to the relevant person by market. Currently notifies via email and logs to Google Sheets — can be adapted to route into a CRM (e.g. HubSpot) as the final step.",
+        "width": 832
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-528, -608],
+      "id": "d5c6471b-faeb-467c-9dd8-cfc11405aca0",
+      "name": "Sticky Note"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    },
+    "Loop Over Items": {
+      "main": [[], [{ "node": "Edit Fields", "type": "main", "index": 0 }]]
+    },
+    "Edit Fields": {
+      "main": [[{ "node": "Search", "type": "main", "index": 0 }]]
+    },
+    "Search": {
+      "main": [[{ "node": "Edit Fields1", "type": "main", "index": 0 }]]
+    },
+    "Edit Fields1": {
+      "main": [[{ "node": "Basic LLM Chain", "type": "main", "index": 0 }]]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [[{ "node": "Basic LLM Chain", "type": "ai_languageModel", "index": 0 }]]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [[{ "node": "Basic LLM Chain", "type": "ai_outputParser", "index": 0 }]]
+    },
+    "Basic LLM Chain": {
+      "main": [[{ "node": "Update Row in Sheet", "type": "main", "index": 0 }, { "node": "Switch", "type": "main", "index": 0 }]]
+    },
+    "Switch": {
+      "main": [
+        [{ "node": "Send Hot Lead Notification", "type": "main", "index": 0 }],
+        [{ "node": "Send Warm Lead Notification", "type": "main", "index": 0 }],
+        [{ "node": "Send Cold Lead Notification", "type": "main", "index": 0 }]
+      ]
+    },
+    "Update Row in Sheet": {
+      "main": [[{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]]
+    },
+    "Send Hot Lead Notification": {
+      "main": [[{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]]
+    },
+    "Send Warm Lead Notification": {
+      "main": [[{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]]
+    },
+    "Send Cold Lead Notification": {
+      "main": [[{ "node": "No Operation, do nothing", "type": "main", "index": 0 }]]
+    },
+    "No Operation, do nothing": {
+      "main": [[{ "node": "Loop Over Items", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timezone": "Asia/Kuala_Lumpur"
+  },
+  "nodeGroups": [],
+  "tags": []
+}
